@@ -2517,6 +2517,54 @@ class TestQuantizedOps(unittest.TestCase):
         caffe_res = c2.run_model(onnx_model, dict(zip(input_names, x_numpy)))[0]
         np.testing.assert_almost_equal(np.squeeze(outputs.numpy()), caffe_res, decimal=3)
 
+    def test_qconv_model(self):
+        class ConvModel(torch.nn.Module):
+            def __init__(self):
+                super(ConvModel, self).__init__()
+                self.qconfig = torch.quantization.default_qconfig
+                self.fc1 = torch.quantization.QuantWrapper(torch.nn.Conv2d(3, 5, 2, bias=False).to(dtype=torch.float))
+
+            def forward(self, x):
+                x = self.fc1(x)
+                return x
+        torch.backends.quantized.engine = "qnnpack"
+        qconfig = torch.quantization.default_qconfig
+        model = ConvModel()
+        model.qconfig = qconfig
+        model = torch.quantization.prepare(model)
+        model = torch.quantization.convert(model)
+
+        x_numpy = np.random.rand(1, 3, 6, 6).astype(np.float32)
+
+        x = torch.from_numpy(x_numpy).to(dtype=torch.float)
+        outputs = model(x)
+        traced = torch.jit.trace(model, x)
+        buf = io.BytesIO()
+        torch.jit.save(traced, buf)
+        buf.seek(0)
+        model = torch.jit.load(buf)
+        input_names = ["x"]
+        torch.onnx.export(model, x, "model.onnx", input_names=input_names, example_outputs=outputs, operator_export_type=torch.onnx.OperatorExportTypes.ONNX_ATEN_FALLBACK)
+        onnx_model = onnx.load('model.onnx')
+        x_c2 = np.transpose(x_numpy, [0, 2, 3, 1])
+        y = np.expand_dims(x_c2, axis=0)
+        caffe_res = c2.run_model(onnx_model, dict(zip(input_names, y)))[0]
+        np.testing.assert_almost_equal(outputs.permute(0, 2, 3, 1).numpy(), caffe_res, decimal=3)
+
+    '''
+    def test_mobilenet_v2(self):
+        module_quant = torch.jit.load("/home/supriyar/test/mobilenet_traced.pth")
+        x_numpy = np.random.rand(1, 3, 224, 224).astype(np.float32)
+        inputs = torch.from_numpy(x_numpy).to(dtype=torch.float)
+        input_names = ["x"]
+        module_quant.eval()
+        output = module_quant(inputs)
+        torch.onnx.export(module_quant, (inputs), 'quant.onnx', verbose=False, input_names=input_names, example_outputs=output, opset_version=9, operator_export_type=torch.onnx.OperatorExportTypes.ONNX_ATEN_FALLBACK)
+        onnx_model = onnx.load('quant.onnx')
+        x_c2 = np.transpose(x_numpy, [0, 2, 3, 1])
+        y = np.expand_dims(x_c2, axis=0)
+        caffe_res = c2.run_model(onnx_model, dict(zip(input_names, y)))[0]
+    '''
 
 if __name__ == '__main__':
     unittest.main()
