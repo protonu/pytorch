@@ -136,7 +136,7 @@ ExprHandle TensorExprKernel::demoteOutput(
     const ExprHandle& e,
     const torch::jit::Value* v) {
   if (v->type()->kind() != TypeKind::TensorType) {
-    throw malformed_input("type is not tensor in demoteOutput");
+    return e;
   }
 
   auto tt = *v->type()->cast<TensorType>()->scalarType();
@@ -293,6 +293,7 @@ Tensor* TensorExprKernel::computeTwoOperandWithAlpha(
 
         promoteInputs(inputs);
         ExprHandle compute = innerExpr(inputs[0], inputs[2] * inputs[1]);
+        //ExprHandle compute = innerExpr(inputs[0], inputs[1]);
         return demoteOutput(compute, n->output());
       });
 }
@@ -396,10 +397,14 @@ Tensor* TensorExprKernel::computeFourOperand(
 Tensor* TensorExprKernel::computeValue(const torch::jit::Value* v) {
   switch (v->node()->kind()) {
     case aten::add: {
-      return computeTwoOperandWithAlpha(
-          "aten_add", v, [](const ExprHandle& lhs, const ExprHandle& rhs) {
-            return lhs + rhs;
-          });
+      auto add_lambda = [](const ExprHandle& lhs, const ExprHandle& rhs) {
+        return lhs + rhs;
+      };
+      TORCH_INTERNAL_ASSERT(
+          v->node()->inputs().size() == 2 || v->node()->inputs().size() == 3);
+      return (v->node()->inputs().size() > 2)
+          ? computeTwoOperandWithAlpha("aten_add", v, add_lambda)
+          : computeTwoOperand("aten_add", v, add_lambda);
     } break;
 
     case aten::_cast_Float: {
@@ -1308,6 +1313,12 @@ void TensorExprKernel::bindInput(const torch::jit::Value* input) {
       scalars_.emplace(input->unique(), v);
       break;
     }
+    case TypeKind::BoolType: {
+      VarHandle v("v" + input->debugName(), kBool);
+      kernelArgs_.emplace_back(v);
+      scalars_.emplace(input->unique(), v);
+      break;
+    }
     case TypeKind::IntType: {
       VarHandle v("v" + input->debugName(), kInt);
       kernelArgs_.emplace_back(v);
@@ -1360,24 +1371,11 @@ void TensorExprKernel::compile() {
 
 TensorExprKernel::TensorExprKernel(const std::shared_ptr<Graph>& subgraph)
     : graph_(subgraph), code_(subgraph, "") {
-  try {
-    compile();
-  } catch (...) {
-    fallback_ = true;
-  }
+  compile();
 }
 
 void TensorExprKernel::run(Stack& stack) {
-  if (fallback_) {
-    fallback(stack);
-    return;
-  }
-  try {
-    runKernel(stack);
-  } catch (...) {
-    fallback_ = true;
-    fallback(stack);
-  }
+  runKernel(stack);
 }
 
 std::vector<CodeGen::CallArg> TensorExprKernel::prepareRunArgs(

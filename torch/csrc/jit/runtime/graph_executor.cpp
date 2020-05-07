@@ -779,9 +779,15 @@ void runNondiffOptimization(
   // Fuse the dequant - op - quant patterns into quantized ops
   QuantFusion(graph);
 
-  FuseGraph(graph, strict_fuser_check);
-
-  FuseTensorExprs(graph);
+  // strict_fuser_check is synonymous with ProfilingExecutor on
+  // if `strict_fuser_check` is set to `true`, run TE by default
+  // otherwise fallback to the legacy executor and legacy fuser
+  if (strict_fuser_check) {
+    FuseTensorExprs(graph);
+  }
+  else {
+    FuseGraph(graph, strict_fuser_check);
+  }
 
   // Run custom post-fusion passes
   for (const auto& passPair : getCustomPostPasses()) {

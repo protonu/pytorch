@@ -776,6 +776,7 @@ class TestDistributions(TestCase):
                 dist = Dist(**param)
                 self.assertTrue(repr(dist).startswith(dist.__class__.__name__))
 
+    #
     def test_sample_detached(self):
         for Dist, params in EXAMPLES:
             for i, param in enumerate(params):
@@ -800,6 +801,7 @@ class TestDistributions(TestCase):
                 self.assertTrue(sample.requires_grad,
                                 msg='{} example {}/{}, .rsample() does not require grad'.format(
                                     Dist.__name__, i + 1, len(params)))
+
 
     def test_enumerate_support_type(self):
         for Dist, params in EXAMPLES:
@@ -845,6 +847,7 @@ class TestDistributions(TestCase):
                 self.assertIn(Dist, distributions_with_examples,
                               "Please add {} to the EXAMPLES list in test_distributions.py".format(Dist.__name__))
 
+
     def test_distribution_expand(self):
         shapes = [torch.Size(), torch.Size((2,)), torch.Size((2, 1))]
         for Dist, params in EXAMPLES:
@@ -871,6 +874,7 @@ class TestDistributions(TestCase):
                                          allow_inf=True)
                     except NotImplementedError:
                         pass
+
 
     def test_distribution_subclass_expand(self):
         expand_by = torch.Size((2,))
@@ -1394,6 +1398,7 @@ class TestDistributions(TestCase):
         high.grad.zero_()
 
     @unittest.skipIf(not TEST_NUMPY, "NumPy not found")
+
     def test_vonmises_sample(self):
         for loc in [0.0, math.pi / 2.0]:
             for concentration in [0.03, 0.3, 1.0, 10.0, 100.0]:
@@ -2460,6 +2465,7 @@ class TestDistributions(TestCase):
                          (2, 5, 2, 3, 5))
         self.assertEqual(ContinuousBernoulli(p).sample((2,)).size(), (2, 2, 3, 5))
 
+
     def test_independent_shape(self):
         for Dist, params in EXAMPLES:
             for param in params:
@@ -2488,6 +2494,7 @@ class TestDistributions(TestCase):
                     except NotImplementedError:
                         pass
 
+
     def test_independent_expand(self):
         for Dist, params in EXAMPLES:
             for param in params:
@@ -2504,6 +2511,7 @@ class TestDistributions(TestCase):
                                          indep_dist.log_prob(expanded_sample))
                         self.assertEqual(expanded.event_shape, indep_dist.event_shape)
                         self.assertEqual(expanded.batch_shape, expanded_shape)
+
 
     def test_cdf_icdf_inverse(self):
         # Tests the invertibility property on the distributions
@@ -2523,6 +2531,7 @@ class TestDistributions(TestCase):
                     'cdf(x) = {}'.format(cdf),
                     'icdf(cdf(x)) = {}'.format(actual),
                 ]))
+
 
     def test_cdf_log_prob(self):
         # Tests if the differentiation of the CDF gives the PDF at a given value
@@ -3219,6 +3228,7 @@ class TestDistributionShapes(TestCase):
         self.assertEqual(gumbel.log_prob(self.tensor_sample_1).size(), torch.Size((3, 2)))
         self.assertEqual(gumbel.log_prob(self.tensor_sample_2).size(), torch.Size((3, 2, 3)))
 
+
     def test_vonmises_shape_tensor_params(self):
         von_mises = VonMises(torch.tensor([0., 0.]), torch.tensor([1., 1.]))
         self.assertEqual(von_mises._batch_shape, torch.Size((2,)))
@@ -3227,6 +3237,7 @@ class TestDistributionShapes(TestCase):
         self.assertEqual(von_mises.sample(torch.Size((3, 2))).size(), torch.Size((3, 2, 2)))
         self.assertEqual(von_mises.log_prob(self.tensor_sample_1).size(), torch.Size((3, 2)))
         self.assertEqual(von_mises.log_prob(torch.ones(2, 1)).size(), torch.Size((2, 2)))
+
 
     def test_vonmises_shape_scalar_params(self):
         von_mises = VonMises(0., 1.)
@@ -3753,6 +3764,7 @@ class TestConstraints(TestCase):
                     message = '{} example {}/{} parameter {} = {}'.format(
                         Dist.__name__, i + 1, len(params), name, value)
                     self.assertTrue(constraint.check(value).all(), msg=message)
+
 
     def test_support_constraints(self):
         for Dist, params in EXAMPLES:
@@ -4758,6 +4770,7 @@ class TestJit(TestCase):
             sample = Dist(**param).sample()
             return values, sample
 
+
     def test_sample(self):
         for Dist, keys, values, sample in self._examples():
 
@@ -4786,6 +4799,7 @@ class TestJit(TestCase):
             xfail = [Beta, Dirichlet]
             if Dist not in xfail:
                 self.assertTrue(any(n.isNondeterministic() for n in traced_f.graph.nodes()))
+
 
     def test_rsample(self):
         for Dist, keys, values, sample in self._examples():
@@ -4838,6 +4852,7 @@ class TestJit(TestCase):
             self.assertEqual(expected, actual,
                              message='{}\nExpected:\n{}\nActual:\n{}'.format(Dist.__name__, expected, actual))
 
+
     def test_enumerate_support(self):
         for Dist, keys, values, sample in self._examples():
             # FIXME traced functions produce incorrect results
@@ -4862,6 +4877,7 @@ class TestJit(TestCase):
             self.assertEqual(expected, actual,
                              message='{}\nExpected:\n{}\nActual:\n{}'.format(Dist.__name__, expected, actual))
 
+
     def test_mean(self):
         for Dist, keys, values, sample in self._examples():
 
@@ -4883,6 +4899,7 @@ class TestJit(TestCase):
             actual[actual == float('inf')] = 0.
             self.assertEqual(expected, actual, allow_inf=True,
                              message='{}\nExpected:\n{}\nActual:\n{}'.format(Dist.__name__, expected, actual))
+
 
     def test_variance(self):
         for Dist, keys, values, sample in self._examples():
@@ -4931,6 +4948,7 @@ class TestJit(TestCase):
             actual = traced_f(*values)
             self.assertEqual(expected, actual, allow_inf=True,
                              message='{}\nExpected:\n{}\nActual:\n{}'.format(Dist.__name__, expected, actual))
+
 
     def test_cdf(self):
         for Dist, keys, values, sample in self._examples():
